@@ -1785,29 +1785,29 @@ static struct model_res settings[] = {
    sendCal2Header_S300_600, setWindowScan_S300_600 },
 
  /*S1300i AC*/
-/* model       xres yres u  mxx   mnx mxy   mny actw  reqw  hedw  padw  bh  calw  cal_hedw  cal_reqw */
+/* model         xres yres u  mxx   mnx mxy   mny actw  reqw  hedw  padw  bh  calw  cal_hedw  cal_reqw */
  { MODEL_S1300I,  150, 150, 0, 1296, 32, 2662, 32, 4256, 1480, 1296, 184, 41, 8512, 2592,    2960,
-   setWindowCoarseCal_S300_150, setWindowFineCal_S300_150,
-   setWindowSendCal_S300_150, sendCal1Header_S300_150,
-   sendCal2Header_S300_150, setWindowScan_S300_150 },
+   setWindowCoarseCal_S1300I_150, setWindowFineCal_S1300I_150,
+   setWindowSendCal_S1300I_150, sendCal1Header_S1300I_150,
+   sendCal2Header_S1300I_150, setWindowScan_S1300I_150 },
 
  { MODEL_S1300I,  225, 200, 0, 1944, 32, 3993, 32, 6144, 2100, 1944, 156, 28, 8192, 2592,    2800,
-   setWindowCoarseCal_S300_225, setWindowFineCal_S300_225,
-   setWindowSendCal_S300_225, sendCal1Header_S300_225,
-   sendCal2Header_S300_225, setWindowScan_S300_225 },
+   setWindowCoarseCal_S1300I_225, setWindowFineCal_S1300I_225,
+   setWindowSendCal_S1300I_225, sendCal1Header_S1300I_225,
+   sendCal2Header_S1300I_225, setWindowScan_S1300I_225 },
 
  { MODEL_S1300I,  300, 300, 0, 2592, 32, 5324, 32, 8192, 2800, 2592, 208, 21, 8192, 2592,    2800,
-   setWindowCoarseCal_S300_300, setWindowFineCal_S300_300,
-   setWindowSendCal_S300_300, sendCal1Header_S300_300,
-   sendCal2Header_S300_300, setWindowScan_S300_300 },
+   setWindowCoarseCal_S1300I_300, setWindowFineCal_S1300I_300,
+   setWindowSendCal_S1300I_300, sendCal1Header_S1300I_300,
+   sendCal2Header_S1300I_300, setWindowScan_S1300I_300 },
 
  { MODEL_S1300I,  600, 600, 0, 5184, 32, 10648, 32, 16064, 5440, 5184, 256, 10, 16064, 5184, 5440,
-   setWindowCoarseCal_S300_600, setWindowFineCal_S300_600,
-   setWindowSendCal_S300_600, sendCal1Header_S300_600,
-   sendCal2Header_S300_600, setWindowScan_S300_600 },
+   setWindowCoarseCal_S1300I_600, setWindowFineCal_S1300I_600,
+   setWindowSendCal_S1300I_600, sendCal1Header_S1300I_600,
+   sendCal2Header_S1300I_600, setWindowScan_S1300I_600 },
 
  /*S1300i USB*/
-/* model       xres yres  u  mxx   mnx mxy   mny actw   reqw  hedw  padw  bh   calw  cal_hedw  cal_reqw */
+/* model         xres yres  u  mxx   mnx mxy   mny actw   reqw  hedw  padw  bh   calw  cal_hedw  cal_reqw */
  { MODEL_S1300I,  150, 150, 1, 1296, 32, 2662, 32, 7216,  2960, 1296, 1664, 24, 14432, 2592,    5920,
    setWindowCoarseCal_S300_150_U, setWindowFineCal_S300_150_U,
    setWindowSendCal_S300_150_U, sendCal1Header_S300_150_U,
@@ -2438,8 +2438,11 @@ coarsecal(struct scanner *s)
 
     DBG (10, "coarsecal: start\n");
 
-    if(s->model == MODEL_S300 || s->model == MODEL_S1300I){
+    if(s->model == MODEL_S300){
         memcpy(pay,coarseCalData_S300,payLen);
+    }
+    else if(s->model == MODEL_S1300I){
+        memcpy(pay,coarseCalData_S1300I,payLen);
     }
     else{
         memcpy(pay,coarseCalData_FI60F,payLen);
