@@ -458,7 +458,39 @@ attach_one (const char *name)
     DBG (15, "attach_one: Found %s scanner %s at %s\n",
       s->sane.vendor, s->sane.model, s->sane.name);
   
-    if (strstr (s->sane.model, "S300") || strstr (s->sane.model, "S1300")){
+    if (strstr (s->sane.model, "S1300i")){
+        unsigned char stat;
+
+        DBG (15, "attach_one: Found S1300i\n");
+
+        stat = get_stat(s);
+        if(stat & 0x01){
+          DBG (5, "attach_one: on USB power?\n");
+          s->usb_power=1;
+        }
+    
+        s->model = MODEL_S1300I;
+
+        s->has_adf = 1;
+        s->x_res_150 = 1;
+        s->x_res_225 = 1;
+        s->x_res_300 = 1;
+        s->x_res_600 = 1;
+        s->y_res_150 = 1;
+        s->y_res_225 = 1;
+        s->y_res_300 = 1;
+        s->y_res_600 = 1;
+
+        s->source = SOURCE_ADF_FRONT;
+	s->mode = MODE_LINEART;
+        s->resolution_x = 300;
+        s->page_height = 11.5 * 1200;
+
+        s->threshold = 120;
+        s->threshold_curve = 55;
+    }
+
+    else if (strstr (s->sane.model, "S300") || strstr (s->sane.model, "S1300")){
         unsigned char stat;
 
         DBG (15, "attach_one: Found S300/S1300\n");
@@ -1752,6 +1784,50 @@ static struct model_res settings[] = {
    setWindowSendCal_S300_600, sendCal1Header_S300_600,
    sendCal2Header_S300_600, setWindowScan_S300_600 },
 
+ /*S1300i AC*/
+/* model       xres yres u  mxx   mnx mxy   mny actw  reqw  hedw  padw  bh  calw  cal_hedw  cal_reqw */
+ { MODEL_S1300I,  150, 150, 0, 1296, 32, 2662, 32, 4256, 1480, 1296, 184, 41, 8512, 2592,    2960,
+   setWindowCoarseCal_S300_150, setWindowFineCal_S300_150,
+   setWindowSendCal_S300_150, sendCal1Header_S300_150,
+   sendCal2Header_S300_150, setWindowScan_S300_150 },
+
+ { MODEL_S1300I,  225, 200, 0, 1944, 32, 3993, 32, 6144, 2100, 1944, 156, 28, 8192, 2592,    2800,
+   setWindowCoarseCal_S300_225, setWindowFineCal_S300_225,
+   setWindowSendCal_S300_225, sendCal1Header_S300_225,
+   sendCal2Header_S300_225, setWindowScan_S300_225 },
+
+ { MODEL_S1300I,  300, 300, 0, 2592, 32, 5324, 32, 8192, 2800, 2592, 208, 21, 8192, 2592,    2800,
+   setWindowCoarseCal_S300_300, setWindowFineCal_S300_300,
+   setWindowSendCal_S300_300, sendCal1Header_S300_300,
+   sendCal2Header_S300_300, setWindowScan_S300_300 },
+
+ { MODEL_S1300I,  600, 600, 0, 5184, 32, 10648, 32, 16064, 5440, 5184, 256, 10, 16064, 5184, 5440,
+   setWindowCoarseCal_S300_600, setWindowFineCal_S300_600,
+   setWindowSendCal_S300_600, sendCal1Header_S300_600,
+   sendCal2Header_S300_600, setWindowScan_S300_600 },
+
+ /*S1300i USB*/
+/* model       xres yres  u  mxx   mnx mxy   mny actw   reqw  hedw  padw  bh   calw  cal_hedw  cal_reqw */
+ { MODEL_S1300I,  150, 150, 1, 1296, 32, 2662, 32, 7216,  2960, 1296, 1664, 24, 14432, 2592,    5920,
+   setWindowCoarseCal_S300_150_U, setWindowFineCal_S300_150_U,
+   setWindowSendCal_S300_150_U, sendCal1Header_S300_150_U,
+   sendCal2Header_S300_150_U, setWindowScan_S300_150_U },
+
+ { MODEL_S1300I,  225, 200, 1, 1944, 32, 3993, 32, 10584, 4320, 1944, 2376, 16, 14112, 2592,    5760,
+   setWindowCoarseCal_S300_225_U, setWindowFineCal_S300_225_U,
+   setWindowSendCal_S300_225_U, sendCal1Header_S300_225_U,
+   sendCal2Header_S300_225_U, setWindowScan_S300_225_U },
+
+ { MODEL_S1300I,  300, 300, 1, 2592, 32, 5324, 32, 15872, 6640, 2592, 4048, 11, 15872, 2592,    6640,
+   setWindowCoarseCal_S300_300_U, setWindowFineCal_S300_300_U,
+   setWindowSendCal_S300_300_U, sendCal1Header_S300_300_U,
+   sendCal2Header_S300_300_U, setWindowScan_S300_300_U },
+
+ { MODEL_S1300I,  600, 600, 1, 5184, 32, 10648, 32, 16064, 5440, 5184, 256, 10, 16064, 5184,    5440,
+   setWindowCoarseCal_S300_600, setWindowFineCal_S300_600,
+   setWindowSendCal_S300_600, sendCal1Header_S300_600,
+   sendCal2Header_S300_600, setWindowScan_S300_600 },
+
  /*fi-60F*/
 /* model       xres  yres u  mxx   mnx mxy   mny actw  reqw  hedw  padw  bh  calw  cal_hedw  cal_reqw */
  { MODEL_FI60F, 150, 150, 0,  648, 32,  875, 32, 1480,  632,  216,  416, 41, 1480,    216,  632,
@@ -1834,7 +1910,7 @@ change_params(struct scanner *s)
         return SANE_STATUS_INVAL;
     }
 
-    if (s->model == MODEL_S300)
+    if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
     {
         img_heads = 1; /* image width is the same as the plane width on the S300 */
         img_pages = 2;
@@ -2362,7 +2438,7 @@ coarsecal(struct scanner *s)
 
     DBG (10, "coarsecal: start\n");
 
-    if(s->model == MODEL_S300){
+    if(s->model == MODEL_S300 || s->model == MODEL_S1300I){
         memcpy(pay,coarseCalData_S300,payLen);
     }
     else{
@@ -2394,7 +2470,7 @@ coarsecal(struct scanner *s)
         try_count--;
 
         /* update the coarsecal payload to use our new dark offset parameters */
-        if (s->model == MODEL_S300)
+        if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
         {
             pay[5] = param[0];
             pay[7] = param[1];
@@ -2689,7 +2765,7 @@ coarsecal(struct scanner *s)
         if (cal_good[0] + cal_good[1] == s->coarsecal.pages) break;
 
         /* update the coarsecal payload to use the new gain parameters */
-        if (s->model == MODEL_S300)
+        if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
         {
             pay[11] = param[0];
             pay[13] = param[1];
@@ -2719,7 +2795,7 @@ finecal_send_cal(struct scanner *s)
 
     int i, j, k;
     unsigned short *p_out, *p_in = (unsigned short *) s->sendcal.buffer;
-    int planes = (s->model == MODEL_S300) ? 2 : 3;
+    int planes = (s->model == MODEL_S300 || s->model == MODEL_S1300I) ? 2 : 3;
 
     /* scramble the raster buffer data into scanner raw format */
     memset(s->cal_data.raw_data, 0, s->cal_data.line_stride);
@@ -2906,7 +2982,7 @@ finecal(struct scanner *s)
 {
     SANE_Status ret = SANE_STATUS_GOOD;
 
-    const int max_pages = (s->model == MODEL_S300 ? 2 : 1);
+    const int max_pages = (s->model == MODEL_S300 || s->model == MODEL_S1300I ? 2 : 1);
     int gain_delta = 0xff - 0xbf;
     float *gain_slope, *last_error;
     int i, j, k, idx, try_count, cal_good;
@@ -3467,7 +3543,7 @@ scan(struct scanner *s)
     
     DBG (10, "scan: start\n");
 
-    if(s->model == MODEL_S300){
+    if(s->model == MODEL_S300 || s->model == MODEL_S1300I){
         cmd[1] = 0xd6;
     }
 
@@ -3544,7 +3620,7 @@ sane_read (SANE_Handle handle, SANE_Byte * buf, SANE_Int max_len, SANE_Int * len
                 s->block_xfr.total_bytes = remainTotal;
             }
             /* send d3 cmd for S300 */
-            if(s->model == MODEL_S300)
+            if(s->model == MODEL_S300 || s->model == MODEL_S1300I)
             {
                 unsigned char cmd[] = {0x1b, 0xd3};
                 size_t cmdLen = 2;
@@ -3587,7 +3663,7 @@ sane_read (SANE_Handle handle, SANE_Byte * buf, SANE_Int max_len, SANE_Int * len
             s->block_xfr.done = 0;
 
             /* get the 0x43 cmd for the S300 */
-            if(s->model == MODEL_S300){
+            if(s->model == MODEL_S300 || s->model == MODEL_S1300I){
 
                 unsigned char cmd[] = {0x1b, 0x43};
                 size_t cmdLen = 2;
@@ -3692,7 +3768,7 @@ descramble_raw(struct scanner *s, struct transfer * tp)
     int height = tp->total_bytes / tp->line_stride;
     int i, j, k, l;
 
-    if (s->model == MODEL_S300)
+    if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
     {
         for (i = 0; i < 2; i++)                        /* page, front/back */
             for (j = 0; j < height; j++)               /* row (y)*/
@@ -3806,7 +3882,7 @@ copy_block_to_page(struct scanner *s,int side)
         for (j = 0; j < width; j++)
         {
             unsigned char r, g, b;
-            if (s->model == MODEL_S300)
+            if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
                 { r = p_in[1]; g = p_in[2]; b = p_in[0]; }
             else /* (s->model == MODEL_FI60F) */
                 { r = p_in[0]; g = p_in[1]; b = p_in[2]; }
