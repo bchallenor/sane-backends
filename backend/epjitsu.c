@@ -1786,17 +1786,17 @@ static struct model_res settings[] = {
 
  /*S1300i AC*/
 /* model         xres yres u  mxx   mnx mxy   mny actw  reqw  hedw  padw  bh  calw  cal_hedw  cal_reqw */
- { MODEL_S1300I,  150, 150, 0, 1296, 32, 2662, 32, 4256, 1480, 1296, 184, 41, 8512, 2592,    2960,
+ { MODEL_S1300I,  150, 150, 0, 1296, 32, 2662, 32, 4016, 1360, 1296,  64, 43, 8032, 2624,     2704,
    setWindowCoarseCal_S1300I_150, setWindowFineCal_S1300I_150,
    setWindowSendCal_S1300I_150, sendCal1Header_S1300I_150,
    sendCal2Header_S1300I_150, setWindowScan_S1300I_150 },
 
- { MODEL_S1300I,  225, 200, 0, 1944, 32, 3993, 32, 6144, 2100, 1944, 156, 28, 8192, 2592,    2800,
+ { MODEL_S1300I,  225, 200, 0, 1944, 32, 3993, 32, 6072, 2064, 1944, 120, 28, 8096, 2646,     2725,
    setWindowCoarseCal_S1300I_225, setWindowFineCal_S1300I_225,
    setWindowSendCal_S1300I_225, sendCal1Header_S1300I_225,
    sendCal2Header_S1300I_225, setWindowScan_S1300I_225 },
 
- { MODEL_S1300I,  300, 300, 0, 2592, 32, 5324, 32, 8192, 2800, 2592, 208, 21, 8192, 2592,    2800,
+ { MODEL_S1300I,  300, 300, 0, 2592, 32, 5324, 32, 8096, 2752, 2592, 160, 21, 8096, 2592,     2752,
    setWindowCoarseCal_S1300I_300, setWindowFineCal_S1300I_300,
    setWindowSendCal_S1300I_300, sendCal1Header_S1300I_300,
    sendCal2Header_S1300I_300, setWindowScan_S1300I_300 },
