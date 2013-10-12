@@ -2800,6 +2800,8 @@ finecal_send_cal(struct scanner *s)
     unsigned short *p_out, *p_in = (unsigned short *) s->sendcal.buffer;
     int planes = (s->model == MODEL_S300 || s->model == MODEL_S1300I) ? 2 : 3;
 
+    DBG (10, "finecal_send_cal: start\n");
+
     /* scramble the raster buffer data into scanner raw format */
     memset(s->cal_data.raw_data, 0, s->cal_data.line_stride);
     for (i = 0; i < planes; i++)
@@ -2897,6 +2899,7 @@ finecal_send_cal(struct scanner *s)
         return SANE_STATUS_IO_ERROR;
     }
 
+    DBG (10, "finecal_send_cal: finish\n");
     return ret;
 }
 
@@ -2913,6 +2916,8 @@ finecal_get_line(struct scanner *s, struct image *img)
 
     int round_offset = img->height / 2;
     int i, j, k;
+
+    DBG (10, "finecal_get_line: start\n");
 
     /* ask for 16 lines */
     ret = set_window(s, WINDOW_FINECAL);
@@ -2970,6 +2975,8 @@ finecal_get_line(struct scanner *s, struct image *img)
             avgpix[j] = (total + round_offset) / img->height;
         }
     }
+
+    DBG (10, "finecal_get_line: finish\n");
     return ret;
 }
 
