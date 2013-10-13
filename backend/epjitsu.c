@@ -1858,7 +1858,7 @@ change_params(struct scanner *s)
 {
     SANE_Status ret = SANE_STATUS_GOOD;
 
-    int img_heads, img_pages, width;
+    int img_heads, img_pages, cal_image_cmpt_bytes, width;
     int i=0;
 
     DBG (10, "change_params: start\n");
@@ -1910,40 +1910,51 @@ change_params(struct scanner *s)
         return SANE_STATUS_INVAL;
     }
 
-    if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
+    if (s->model == MODEL_S300)
     {
         img_heads = 1; /* image width is the same as the plane width on the S300 */
         img_pages = 2;
+        cal_image_cmpt_bytes = 1;
+    }
+    else if (s->model == MODEL_S1300I)
+    {
+        img_heads = 1; /* image width is the same as the plane width on the S1300i */
+        img_pages = 2;
+        cal_image_cmpt_bytes = 2;
     }
     else /* (s->model == MODEL_FI60F) */
     {
         img_heads = 3; /* image width is 3* the plane width on the FI-60F */
         img_pages = 1;
+        cal_image_cmpt_bytes = 1;
     }
     
     /* set up the transfer structs */
     s->cal_image.plane_width = settings[i].cal_headwidth;
-    s->cal_image.plane_stride = settings[i].cal_reqwidth * 3;
-    s->cal_image.line_stride = settings[i].cal_width * 3;
+    s->cal_image.plane_stride = settings[i].cal_reqwidth * 3 * cal_image_cmpt_bytes;
+    s->cal_image.line_stride = settings[i].cal_width * 3 * cal_image_cmpt_bytes;
+    s->cal_image.cmpt_bytes = cal_image_cmpt_bytes;
     s->cal_image.raw_data = NULL;
     s->cal_image.image = NULL;
 
     s->cal_data.plane_width = settings[i].cal_headwidth; /* width is the same, but there are 2 bytes per pixel component */
-    s->cal_data.plane_stride = settings[i].cal_reqwidth * 6;
-    s->cal_data.line_stride = settings[i].cal_width * 6;
+    s->cal_data.plane_stride = settings[i].cal_reqwidth * 3 * 2;
+    s->cal_data.line_stride = settings[i].cal_width * 3 * 2;
+    s->cal_data.cmpt_bytes = 2;
     s->cal_data.raw_data = NULL;
     s->cal_data.image = &s->sendcal;
 
     s->block_xfr.plane_width = settings[i].head_width;
     s->block_xfr.plane_stride = settings[i].req_width * 3;
     s->block_xfr.line_stride = settings[i].act_width * 3;
+    s->block_xfr.cmpt_bytes = 1;
     s->block_xfr.raw_data = NULL;
     s->block_xfr.image = &s->block_img;
 
     /* set up the block image used during scanning operation */
     width = s->block_xfr.plane_width * img_heads;
     s->block_img.width_pix = width;
-    s->block_img.width_bytes = width * 3;
+    s->block_img.width_cmpts = width * 3;
     s->block_img.height = settings[i].block_height;
     s->block_img.pages = img_pages;
     s->block_img.buffer = NULL;
@@ -1951,7 +1962,7 @@ change_params(struct scanner *s)
     /* set up the calibration image blocks */
     width = s->cal_image.plane_width * img_heads;
     s->coarsecal.width_pix = s->darkcal.width_pix = s->lightcal.width_pix = width;
-    s->coarsecal.width_bytes = s->darkcal.width_bytes = s->lightcal.width_bytes = width * 3;
+    s->coarsecal.width_cmpts = s->darkcal.width_cmpts = s->lightcal.width_cmpts = width * 3;
     s->coarsecal.height = 1;
     s->darkcal.height = s->lightcal.height = 16;
     s->coarsecal.pages = s->darkcal.pages = s->lightcal.pages = img_pages;
@@ -1960,7 +1971,7 @@ change_params(struct scanner *s)
     /* set up the calibration data block */
     width = s->cal_data.plane_width * img_heads;
     s->sendcal.width_pix = width;
-    s->sendcal.width_bytes = width * 6;  /* 2 bytes of cal data per pixel component */
+    s->sendcal.width_cmpts = width * 3;
     s->sendcal.height = 1;
     s->sendcal.pages = img_pages;
     s->sendcal.buffer = NULL;
@@ -2294,7 +2305,7 @@ sane_start (SANE_Handle handle)
         /* reset front and back page counters */
         for (i = 0; i < 2; i++)
         {
-            struct image *page_img = s->pages[i].image;
+            struct page_image *page_img = s->pages[i].image;
             s->pages[i].bytes_total = page_img->width_bytes * page_img->height;
             s->pages[i].bytes_scanned = 0;
             s->pages[i].bytes_read = 0;
@@ -2326,25 +2337,25 @@ setup_buffers(struct scanner *s)
     DBG (10, "setup_buffers: start\n");
 
     /* temporary cal data */
-    s->coarsecal.buffer = calloc (1,s->coarsecal.width_bytes * s->coarsecal.height * s->coarsecal.pages);
+    s->coarsecal.buffer = calloc (s->coarsecal.width_cmpts * s->coarsecal.height * s->coarsecal.pages, sizeof(unsigned short));
     if(!s->coarsecal.buffer){
         DBG (5, "setup_buffers: ERROR: failed to setup coarse cal buffer\n");
         return SANE_STATUS_NO_MEM;
     }
 
-    s->darkcal.buffer = calloc (1,s->darkcal.width_bytes * s->darkcal.height * s->darkcal.pages);
+    s->darkcal.buffer = calloc (s->darkcal.width_cmpts * s->darkcal.height * s->darkcal.pages, sizeof(unsigned short));
     if(!s->darkcal.buffer){
         DBG (5, "setup_buffers: ERROR: failed to setup fine cal buffer\n");
         return SANE_STATUS_NO_MEM;
     }
 
-    s->lightcal.buffer = calloc (1,s->lightcal.width_bytes * s->lightcal.height * s->lightcal.pages);
+    s->lightcal.buffer = calloc (s->lightcal.width_cmpts * s->lightcal.height * s->lightcal.pages, sizeof(unsigned short));
     if(!s->lightcal.buffer){
         DBG (5, "setup_buffers: ERROR: failed to setup fine cal buffer\n");
         return SANE_STATUS_NO_MEM;
     }
 
-    s->sendcal.buffer = calloc (1,s->sendcal.width_bytes * s->sendcal.height * s->sendcal.pages);
+    s->sendcal.buffer = calloc (s->sendcal.width_cmpts * s->sendcal.height * s->sendcal.pages, sizeof(unsigned short));
     if(!s->sendcal.buffer){
         DBG (5, "setup_buffers: ERROR: failed to setup send cal buffer\n");
         return SANE_STATUS_NO_MEM;
@@ -2363,7 +2374,7 @@ setup_buffers(struct scanner *s)
     }
 
     /* grab up to 512K at a time */
-    s->block_img.buffer = calloc (1,s->block_img.width_bytes * s->block_img.height * s->block_img.pages);
+    s->block_img.buffer = calloc (s->block_img.width_cmpts * s->block_img.height * s->block_img.pages, sizeof(unsigned short));
     if(!s->block_img.buffer){
         DBG (5, "setup_buffers: ERROR: failed to setup block image buffer\n");
         return SANE_STATUS_NO_MEM;
@@ -2433,8 +2444,10 @@ coarsecal(struct scanner *s)
     unsigned char pay[28];
 
     int try_count, cal_good[2], x, i, j;
-    int param[2], zcount[2], high_param[2], low_param[2], avg[2], maxval[2];
-    int rgb_avg[2][3], rgb_hicount[2][3];
+    int param[2], zcount[2], high_param[2], low_param[2];
+    float avg[2], maxval[2];
+    int rgb_hicount[2][3];
+    float rgb_avg[2][3];
 
     DBG (10, "coarsecal: start\n");
 
@@ -2564,27 +2577,27 @@ coarsecal(struct scanner *s)
         /* gather statistics: count the proportion of 0-valued pixels */
         /* since the lamp is off, there's no point in looking at the green or blue data - they're all from the same sensor anyway */
         zcount[0] = zcount[1] = 0;
-        avg[0] = avg[1] = 0;
-        maxval[0] = maxval[1] = 0;
+        avg[0] = avg[1] = 0.0f;
+        maxval[0] = maxval[1] = 0.0f;
         for (j = 0; j < s->coarsecal.pages; j++)
         {
-            int page_offset = j * s->coarsecal.width_bytes * s->coarsecal.height;
-            for (x = 0; x < s->coarsecal.width_bytes; x++)
+            int page_offset = j * s->coarsecal.width_cmpts * s->coarsecal.height;
+            for (x = 0; x < s->coarsecal.width_cmpts; x++)
             {
-                int val = s->coarsecal.buffer[page_offset + x];
+                float val = s->coarsecal.buffer[page_offset + x] / 256.0f; /* so 0.0f <= value < 256.0f */
                 avg[j] += val;
-                if (val == 0)        zcount[j]++;
+                if (val == 0.0f)     zcount[j]++;
                 if (val > maxval[j]) maxval[j] = val;
             }
         }
         /* convert the zero counts from a pixel count to a proportion in tenths of a percent */
         for (j = 0; j < s->coarsecal.pages; j++)
         {
-            avg[j] /= s->coarsecal.width_bytes;
-            zcount[j] = zcount[j] * 1000 / s->coarsecal.width_bytes;
+            avg[j] /= s->coarsecal.width_cmpts;
+            zcount[j] = zcount[j] * 1000 / s->coarsecal.width_cmpts;
         }
-        DBG(15, "coarsecal offset: average pixel values front: %i  back: %i\n", avg[0], avg[1]);
-        DBG(15, "coarsecal offset: maximum pixel values front: %i  back: %i\n", maxval[0], maxval[1]);
+        DBG(15, "coarsecal offset: average pixel values front: %f  back: %f\n", avg[0], avg[1]);
+        DBG(15, "coarsecal offset: maximum pixel values front: %f  back: %f\n", maxval[0], maxval[1]);
         DBG(15, "coarsecal offset: 0-valued pixel count front: %f%% back: %f%%\n", zcount[0] / 10.0f, zcount[1] / 10.0f);
 
         /* check the values, adjust parameters if they are not within the target range */
@@ -2712,11 +2725,12 @@ coarsecal(struct scanner *s)
             for (x = 0; x < s->coarsecal.width_pix; x++)
             {
                 /* get color channel values and count of pixels pegged at 255 */
-                unsigned char *rgbpix = s->coarsecal.buffer + (i * s->coarsecal.width_bytes * s->coarsecal.height) + x * 3;
+                unsigned short *rgbpix = s->coarsecal.buffer + (i * s->coarsecal.width_cmpts * s->coarsecal.height) + x * 3;
                 for (j = 0; j < 3; j++)
                 {
-                    rgb_avg[i][j] += rgbpix[j];
-                    if (rgbpix[j] == 255)
+                    float val = rgbpix[j] / 256.0f; /* so 0.0f <= value < 256.0f */
+                    rgb_avg[i][j] += val;
+                    if (val >= 255.0f)
                         rgb_hicount[i][j]++;
                 }
             }
@@ -2741,9 +2755,9 @@ coarsecal(struct scanner *s)
             }
             zcount[i] = MAX3(rgb_hicount[i][0], rgb_hicount[i][1], rgb_hicount[i][2]);
         }
-        DBG(15, "coarsecal gain: average RGB values front: (%i,%i,%i)  back: (%i,%i,%i)\n",
+        DBG(15, "coarsecal gain: average RGB values front: (%f,%f,%f)  back: (%f,%f,%f)\n",
             rgb_avg[0][0], rgb_avg[0][1], rgb_avg[0][2], rgb_avg[1][0], rgb_avg[1][1], rgb_avg[1][2]);
-        DBG(15, "coarsecal gain: 255-valued pixel count front: (%g,%g,%g) back: (%g,%g,%g)\n",
+        DBG(15, "coarsecal gain: 255-valued pixel count front: (%f%%,%f%%,%f%%) back: (%f%%,%f%%,%f%%)\n",
             rgb_hicount[0][0]/10.0f, rgb_hicount[0][1]/10.0f, rgb_hicount[0][2]/10.0f,
             rgb_hicount[1][0]/10.0f, rgb_hicount[1][1]/10.0f, rgb_hicount[1][2]/10.0f);
 
@@ -2797,7 +2811,7 @@ finecal_send_cal(struct scanner *s)
     unsigned char stat[2];
 
     int i, j, k;
-    unsigned short *p_out, *p_in = (unsigned short *) s->sendcal.buffer;
+    unsigned short *p_out, *p_in = s->sendcal.buffer;
     int planes = (s->model == MODEL_S300 || s->model == MODEL_S1300I) ? 2 : 3;
 
     DBG (10, "finecal_send_cal: start\n");
@@ -2809,7 +2823,9 @@ finecal_send_cal(struct scanner *s)
             for (k = 0; k < 3; k++)
             {
                 p_out = (unsigned short *) (s->cal_data.raw_data + k * s->cal_data.plane_stride + j * 6 + i * 2);
-                *p_out = *p_in++; /* dark offset, gain */
+                /* host byte order is cancelled out between the load and the store */
+                /* so we need buffer and raw_data to have the same byte order */
+                *p_out = *p_in++;
             }
 
     ret = set_window(s, WINDOW_SENDCAL);
@@ -2904,7 +2920,7 @@ finecal_send_cal(struct scanner *s)
 }
 
 static SANE_Status
-finecal_get_line(struct scanner *s, struct image *img)
+finecal_get_line(struct scanner *s, struct transfer_image *img)
 {
     SANE_Status ret = SANE_STATUS_GOOD;
 
@@ -2963,14 +2979,14 @@ finecal_get_line(struct scanner *s, struct image *img)
     /* average the columns of pixels together and put the results in the top line(s) */
     for (i = 0; i < img->pages; i++)
     {
-        unsigned char *linepix = img->buffer + i * img->width_bytes * img->height;
-        unsigned char *avgpix = img->buffer + i * img->width_bytes;
-        for (j = 0; j < img->width_bytes; j++)
+        unsigned short *linepix = img->buffer + i * img->width_cmpts * img->height;
+        unsigned short *avgpix = img->buffer + i * img->width_cmpts;
+        for (j = 0; j < img->width_cmpts; j++)
         {
             int total = 0;
 
             for (k = 0; k < img->height; k++)
-                total += linepix[j + k * img->width_bytes];
+                total += linepix[j + k * img->width_cmpts];
 
             avgpix[j] = (total + round_offset) / img->height;
         }
@@ -2987,23 +3003,37 @@ round2(float x)
     return (float)(x >= 0.0) ? (int)(x+0.5) : (int)(x-0.5);
 }
 
+static inline unsigned char
+finecal_get_param(unsigned short *p_in, int idx)
+{
+    unsigned char *params = (unsigned char *)p_in;
+    return params[idx];
+}
+
+static inline void
+finecal_set_param(unsigned short *p_in, int idx, unsigned char value)
+{
+    unsigned char *params = (unsigned char *)p_in;
+    params[idx] = value;
+}
+
 static SANE_Status
 finecal(struct scanner *s)
 {
     SANE_Status ret = SANE_STATUS_GOOD;
 
     const int max_pages = (s->model == MODEL_S300 || s->model == MODEL_S1300I ? 2 : 1);
-    int gain_delta = 0xff - 0xbf;
+    float gain_delta = (float)(0xff - 0xbf);
     float *gain_slope, *last_error;
     int i, j, k, idx, try_count, cal_good;
 
     DBG (10, "finecal: start\n");
 
     /* set fine dark offset to 0 and fix all fine gains to lowest parameter (0xFF) */
-    for (i = 0; i < s->sendcal.width_bytes * s->sendcal.pages / 2; i++)
+    for (i = 0; i < s->sendcal.width_cmpts * s->sendcal.pages; i++)
     {
-        s->sendcal.buffer[i*2] = 0;
-        s->sendcal.buffer[i*2+1] = 0xff;
+        finecal_set_param(&s->sendcal.buffer[i], 0, 0x00);
+        finecal_set_param(&s->sendcal.buffer[i], 1, 0xff);
     }
     ret = finecal_send_cal(s);
     if(ret) return ret;
@@ -3020,10 +3050,10 @@ finecal(struct scanner *s)
     if(ret) return ret;
 
     /* set fine dark offset to 0 and fine gain to a fixed higher-gain parameter (0xBF) */
-    for (i = 0; i < s->sendcal.width_bytes * s->sendcal.pages / 2; i++)
+    for (i = 0; i < s->sendcal.width_cmpts * s->sendcal.pages; i++)
     {
-        s->sendcal.buffer[i*2] = 0;
-        s->sendcal.buffer[i*2+1] = 0xbf;
+        finecal_set_param(&s->sendcal.buffer[i], 0, 0x00);
+        finecal_set_param(&s->sendcal.buffer[i], 1, 0xbf);
     }
     ret = finecal_send_cal(s);
     if(ret) return ret;
@@ -3033,7 +3063,7 @@ finecal(struct scanner *s)
     if(ret) return ret;
 
     /* calculate the per pixel slope of pixel value delta over gain delta */
-    gain_slope = malloc(s->lightcal.width_bytes * s->lightcal.pages * sizeof(float));
+    gain_slope = malloc(s->lightcal.width_cmpts * s->lightcal.pages * sizeof(float));
     if (!gain_slope)
         return SANE_STATUS_NO_MEM;
     idx = 0;
@@ -3043,32 +3073,32 @@ finecal(struct scanner *s)
         {
             for (k = 0; k < 3; k++)
             {
-                int value_delta = s->lightcal.buffer[idx] - s->darkcal.buffer[idx];
+                float value_delta = (s->lightcal.buffer[idx] - s->darkcal.buffer[idx]) / 256.0f;
                 /* limit this slope to 1 or less, to avoid overshoot if the lightcal ref input is clipped at 255 */
                 if (value_delta < gain_delta)
                     gain_slope[idx] = -1.0;
                 else
-                    gain_slope[idx] = (float) -gain_delta / value_delta;
+                    gain_slope[idx] = -gain_delta / value_delta;
                 idx++;
             }
         }
     }
 
     /* keep track of the last iteration's pixel error.  If we overshoot, we can reduce the value of the gain slope */
-    last_error = malloc(s->lightcal.width_bytes * s->lightcal.pages * sizeof(float));
+    last_error = malloc(s->lightcal.width_cmpts * s->lightcal.pages * sizeof(float));
     if (!last_error)
     {
         free(gain_slope);
         return SANE_STATUS_NO_MEM;
     }
-    for (i = 0; i < s->lightcal.width_bytes * s->lightcal.pages; i++)
+    for (i = 0; i < s->lightcal.width_cmpts * s->lightcal.pages; i++)
         last_error[i] = 0.0;
 
     /* fine calibration feedback loop */
     try_count = 8;
     while (try_count > 0)
     {
-        int min_value[2][3], max_value[2][3];
+        float min_value[2][3], max_value[2][3];
         float avg_value[2][3], variance[2][3];
         int high_pegs = 0, low_pegs = 0;
         try_count--;
@@ -3093,9 +3123,9 @@ finecal(struct scanner *s)
             {
                 for (k = 0; k < 3; k++)
                 {
-                    int pixvalue = s->lightcal.buffer[idx];
+                    float pixvalue = s->lightcal.buffer[idx] / 256.0f;
                     float pixerror = (fine_gain_target[i] * white_factor[k] - pixvalue);
-                    int oldgain = s->sendcal.buffer[idx * 2 + 1];
+                    int oldgain = finecal_get_param(&s->sendcal.buffer[idx], 1);
                     int newgain;
                     /* if we overshot the last correction, reduce the gain_slope */
                     if (pixerror * last_error[idx] < 0.0)
@@ -3106,15 +3136,14 @@ finecal(struct scanner *s)
                     if (newgain < 0)
                     {
                         low_pegs++;
-                        s->sendcal.buffer[idx * 2 + 1] = 0;
+                        newgain = 0;
                     }
                     else if (newgain > 0xff)
                     {
                         high_pegs++;
-                        s->sendcal.buffer[idx * 2 + 1] = 0xff;
+                        newgain = 0xff;
                     }
-                    else
-                        s->sendcal.buffer[idx * 2 + 1] = newgain;
+                    finecal_set_param(&s->sendcal.buffer[idx], 1, newgain);
                     /* update statistics */
                     if (pixvalue < min_value[i][k]) min_value[i][k] = pixvalue;
                     if (pixvalue > max_value[i][k]) max_value[i][k] = pixvalue;
@@ -3144,9 +3173,9 @@ finecal(struct scanner *s)
         DBG (15, "finecal: -------------------- Gain\n");
         DBG (15, "finecal: RGB Average Error - Front: (%.1f,%.1f,%.1f) - Back: (%.1f,%.1f,%.1f)\n",
              avg_value[0][0], avg_value[0][1], avg_value[0][2], avg_value[1][0], avg_value[1][1], avg_value[1][2]);
-        DBG (15, "finecal: RGB Maximum - Front: (%i,%i,%i) - Back: (%i,%i,%i)\n",
+        DBG (15, "finecal: RGB Maximum - Front: (%.1f,%.1f,%.1f) - Back: (%.1f,%.1f,%.1f)\n",
              max_value[0][0], max_value[0][1], max_value[0][2], max_value[1][0], max_value[1][1], max_value[1][2]);
-        DBG (15, "finecal: RGB Minimum - Front: (%i,%i,%i) - Back: (%i,%i,%i)\n",
+        DBG (15, "finecal: RGB Minimum - Front: (%.1f,%.1f,%.1f) - Back: (%.1f,%.1f,%.1f)\n",
              min_value[0][0], min_value[0][1], min_value[0][2], min_value[1][0], min_value[1][1], min_value[1][2]);
         DBG (15, "finecal: Variance - Front: (%.1f,%.1f,%.1f) - Back: (%.1f,%.1f,%.1f)\n",
              variance[0][0], variance[0][1], variance[0][2], variance[1][0], variance[1][1], variance[1][2]);
@@ -3769,13 +3798,42 @@ sane_read (SANE_Handle handle, SANE_Byte * buf, SANE_Int max_len, SANE_Int * len
     return ret;
 }
 
+/* de-scrambles a single raw value */
+static inline unsigned short
+descramble_cmpt(unsigned char *p_in, int cmpt_bytes)
+{
+    unsigned char hi, lo;
+
+    switch (cmpt_bytes)
+    {
+        case 2:
+            lo = *p_in++;
+            hi = *p_in++;
+            break;
+
+        case 1:
+            lo = 0;
+            hi = *p_in++;
+            break;
+
+        default:
+            lo = 0;
+            hi = 0;
+            break;
+    }
+
+    return (hi << 8) | lo;
+}
+
 /* de-scrambles the raw data from the scanner into the image buffer */
 static SANE_Status
 descramble_raw(struct scanner *s, struct transfer * tp)
 {
     SANE_Status ret = SANE_STATUS_GOOD;
-    unsigned char *p_in, *p_out = tp->image->buffer;
+    unsigned char *p_in;
+    unsigned short *p_out = tp->image->buffer;
     int height = tp->total_bytes / tp->line_stride;
+    int cmpt_bytes = tp->cmpt_bytes;
     int i, j, k, l;
 
     if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
@@ -3785,8 +3843,8 @@ descramble_raw(struct scanner *s, struct transfer * tp)
                 for (k = 0; k < tp->plane_width; k++)  /* column (x) */
                     for (l = 0; l < 3; l++)            /* color component */
                     {
-                        p_in = (unsigned char *) tp->raw_data + (j * tp->line_stride) + (l * tp->plane_stride) + k * 3 + i;
-                        *p_out++ = *p_in;
+                        p_in = (unsigned char *) tp->raw_data + (j * tp->line_stride) + (l * tp->plane_stride) + (k * 3 + i) * cmpt_bytes;
+                        *p_out++ = descramble_cmpt(p_in, cmpt_bytes);
                     }
     }
     else /* MODEL_FI60F */
@@ -3796,8 +3854,8 @@ descramble_raw(struct scanner *s, struct transfer * tp)
                 for (k = 0; k < tp->plane_width; k++)  /* column within the read head */
                     for (l = 0; l < 3; l++)            /* color component */
                     {
-                        p_in = (unsigned char *) tp->raw_data + (i * tp->line_stride) + (l * tp->plane_stride) + k * 3 + j;
-                        *p_out++ = *p_in;
+                        p_in = (unsigned char *) tp->raw_data + (i * tp->line_stride) + (l * tp->plane_stride) + (k * 3 + j) * cmpt_bytes;
+                        *p_out++ = descramble_cmpt(p_in, cmpt_bytes);
                     }
     }
 
@@ -3872,7 +3930,7 @@ copy_block_to_page(struct scanner *s,int side)
     struct page * page = &s->pages[side];
     int height = block->total_bytes / block->line_stride;
     int width = block->image->width_pix;
-    int block_page_stride = block->image->width_bytes * block->image->height;
+    int block_page_stride = block->image->width_cmpts * block->image->height;
     int page_y_offset = page->bytes_scanned / page->image->width_bytes;
     int line_reverse = (side == SIDE_BACK) || (s->model == MODEL_FI60F);
     int i,j;
@@ -3882,7 +3940,7 @@ copy_block_to_page(struct scanner *s,int side)
     /* loop over all the lines in the block */
     for (i = 0; i < height; i++)
     {
-        unsigned char * p_in = block->image->buffer + (side * block_page_stride) + (i * block->image->width_bytes);
+        unsigned short * p_in = block->image->buffer + (side * block_page_stride) + (i * block->image->width_cmpts);
         unsigned char * p_out = page->image->buffer + ((i + page_y_offset) * page->image->width_bytes);
         unsigned char * lineStart = p_out;
         /* reverse order for back side or FI-60F scanner */
@@ -3893,9 +3951,9 @@ copy_block_to_page(struct scanner *s,int side)
         {
             unsigned char r, g, b;
             if (s->model == MODEL_S300 || s->model == MODEL_S1300I)
-                { r = p_in[1]; g = p_in[2]; b = p_in[0]; }
+                { r = p_in[1] >> 8; g = p_in[2] >> 8; b = p_in[0] >> 8; }
             else /* (s->model == MODEL_FI60F) */
-                { r = p_in[0]; g = p_in[1]; b = p_in[2]; }
+                { r = p_in[0] >> 8; g = p_in[1] >> 8; b = p_in[2] >> 8; }
             if (s->mode == MODE_COLOR)
             {
                 *p_out++ = r;

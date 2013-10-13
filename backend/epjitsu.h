@@ -51,13 +51,19 @@ enum scanner_Option
 #define MAX_IMG_PASS 0x10000
 #define MAX_IMG_BLOCK 0x80000
 
-struct image {
+/* --------------------------------------------------------------------- */
+/* used for intermediate images                                          */
+/* buffer contains true 16-bit components where they are available       */
+/* (e.g. during calibration with the S1300i),                            */
+/* otherwise 8-bit components are scaled to 16-bit by shifting up by 8   */
+/* note that in the latter case the max value will be 0xff00             */
+struct transfer_image {
   int width_pix;
-  int width_bytes;
+  int width_cmpts;
   int height;
   int pages;
 
-  unsigned char * buffer;
+  unsigned short *buffer;
 };
 
 struct transfer {
@@ -65,12 +71,31 @@ struct transfer {
   int plane_stride;  /* in bytes */
   int line_stride;   /* in bytes */
 
+  /* --------------------------------------------------------------------- */
+  /* bytes per component in the raw_data representation                    */
+  /* 1 = 8-bit (scaled to 16-bit in image->buffer)                         */
+  /* 2 = 16-bit little-endian                                              */
+  int cmpt_bytes;
+
   int total_bytes;
   int rx_bytes;
   int done;
 
-  unsigned char * raw_data;
-  struct image * image;
+  unsigned char *raw_data;
+  struct transfer_image *image;
+};
+
+/* --------------------------------------------------------------------- */
+/* used for the final image                                              */
+/* format will be 24-bit color, 8-bit grayscale, or 1-bit lineart        */
+/* no scanners currently output 16-bit components during the main scan   */
+struct page_image {
+  int width_pix;
+  int width_bytes;
+  int height;
+  int pages;
+
+  unsigned char *buffer;
 };
 
 struct page {
@@ -78,7 +103,7 @@ struct page {
   int bytes_scanned;
   int bytes_read;
   int done;
-  struct image *image;
+  struct page_image *image;
 };
 
 struct scanner
@@ -200,13 +225,13 @@ struct scanner
 
   /* holds temp buffers for getting 16 lines of cal data */
   struct transfer cal_image;
-  struct image coarsecal;
-  struct image darkcal;
-  struct image lightcal;
+  struct transfer_image coarsecal;
+  struct transfer_image darkcal;
+  struct transfer_image lightcal;
 
   /* holds temp buffer for building calibration data */
   struct transfer cal_data;
-  struct image sendcal;
+  struct transfer_image sendcal;
 
   /* scanner transmits more data per line than requested */
   /* due to padding and/or duplex interlacing */
@@ -227,17 +252,17 @@ struct scanner
   /* but always ends on a scanline. */
   /* the block struct holds the most recent buffer */
   struct transfer block_xfr;
-  struct image    block_img;
+  struct transfer_image block_img;
 
   /* temporary buffers used by dynamic threshold code */
-  struct image  dt;
+  struct page_image dt;
   unsigned char dt_lut[256];
 
   /* final-sized front image, always used */
-  struct image front;
+  struct page_image front;
 
   /* final-sized back image, only used during duplex/backside */
-  struct image back;
+  struct page_image back;
 
   /* --------------------------------------------------------------------- */
   /* values used by the command and data sending function                  */
